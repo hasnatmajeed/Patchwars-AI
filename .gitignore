@@ -1,0 +1,33 @@
+﻿/archive
+/archive.*
+/*.zip
+/data/raw/
+/data/processed/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+.venv/
+venv/
+env/
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+dist/
+build/
+coverage/
+.env
+.env.*
+.env.example
+
+# Temporary files
+*.tmp
+.scanner-tmp/
+
+# Local npm cache
+/.npm-cache/

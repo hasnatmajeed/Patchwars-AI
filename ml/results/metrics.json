@@ -1,0 +1,34 @@
+{
+  "experiment": "exploratory_raw_labels",
+  "label_semantics": "unverified",
+  "evaluation_split": "validation",
+  "labels": [
+    "0",
+    "1"
+  ],
+  "training_examples": 2000,
+  "validation_examples": 1486,
+  "accuracy": 0.8492597577388964,
+  "macro_f1": 0.8412393162393162,
+  "balanced_accuracy": 0.8351614124545622,
+  "confusion_matrix": [
+    [
+      798,
+      71
+    ],
+    [
+      153,
+      464
+    ]
+  ],
+  "configuration": {
+    "seed": 42,
+    "max_features": 5000,
+    "max_chars": 10000,
+    "train_limit": 2000,
+    "ngram_range": [
+      3,
+      5
+    ]
+  }
+}
