@@ -1,0 +1,158 @@
+{
+  "provenance": "Original synthetic examples authored for this demonstration; not derived from third-party datasets.",
+  "label_criteria": "Within each group, preference reflects the stated requirement as judged during example construction; labels are not derived from training feature values and are not real-world reliability outcomes.",
+  "groups": [
+    {
+      "id": "eval_numbers",
+      "split": "train",
+      "requirement": "Parse an integer without executing arbitrary input.",
+      "original": "def parse(s):\n    return eval(s)\n",
+      "candidates": [
+        {
+          "code": "def parse(s):\n    return int(s)\n",
+          "preferred": true,
+          "reason": "Converts a number without evaluating code."
+        },
+        {
+          "code": "def parse(s):\n    return eval(s)\n",
+          "preferred": false,
+          "reason": "Still evaluates arbitrary input."
+        }
+      ],
+      "family": "eval"
+    },
+    {
+      "id": "subprocess_args",
+      "split": "train",
+      "requirement": "Pass a filename as an argument without shell interpretation.",
+      "original": "import subprocess\ndef show(name):\n    return subprocess.run('cat '+name, shell=True)\n",
+      "candidates": [
+        {
+          "code": "import subprocess\ndef show(name):\n    return subprocess.run(['cat', name], check=True)\n",
+          "preferred": true,
+          "reason": "Uses an argument list without a shell."
+        },
+        {
+          "code": "import subprocess\ndef show(name):\n    return subprocess.run('cat '+name, shell=True)\n",
+          "preferred": false,
+          "reason": "Still lets the shell interpret the filename."
+        }
+      ],
+      "family": "subprocess"
+    },
+    {
+      "id": "secret_config",
+      "split": "train",
+      "requirement": "Read a secret from the environment instead of embedding it in source.",
+      "original": "TOKEN = 'demo-hardcoded-value'\n",
+      "candidates": [
+        {
+          "code": "import os\nTOKEN = os.environ['APP_TOKEN']\n",
+          "preferred": true,
+          "reason": "Configuration comes from outside the source."
+        },
+        {
+          "code": "TOKEN = 'demo-hardcoded-value'\n",
+          "preferred": false,
+          "reason": "The value remains embedded in source."
+        }
+      ],
+      "family": "secret"
+    },
+    {
+      "id": "hash_password",
+      "split": "train",
+      "requirement": "Derive a password key with a salt and PBKDF2 instead of a plain fast hash.",
+      "original": "import hashlib\ndef key(password):\n    return hashlib.md5(password).digest()\n",
+      "candidates": [
+        {
+          "code": "import hashlib\ndef key(password, salt):\n    return hashlib.pbkdf2_hmac('sha256', password, salt, 200000)\n",
+          "preferred": true,
+          "reason": "Uses salted password key derivation; salt management still requires review."
+        },
+        {
+          "code": "import hashlib\ndef key(password):\n    return hashlib.md5(password).digest()\n",
+          "preferred": false,
+          "reason": "Retains a fast unsalted hash."
+        }
+      ],
+      "family": "hash"
+    },
+    {
+      "id": "tempfile",
+      "split": "train",
+      "requirement": "Create a temporary file using an API that creates it securely.",
+      "original": "import tempfile\ndef make():\n    return tempfile.mktemp()\n",
+      "candidates": [
+        {
+          "code": "import tempfile\ndef make():\n    return tempfile.NamedTemporaryFile()\n",
+          "preferred": true,
+          "reason": "Creates the temporary file rather than returning an unchecked name."
+        },
+        {
+          "code": "import tempfile\ndef make():\n    return tempfile.mktemp()\n",
+          "preferred": false,
+          "reason": "Retains the unsafe name-only API."
+        }
+      ],
+      "family": "tempfile"
+    },
+    {
+      "id": "exception",
+      "split": "validation",
+      "requirement": "Catch only invalid integer input rather than hiding every exception.",
+      "original": "def parse(s):\n    try:\n        return int(s)\n    except:\n        return None\n",
+      "candidates": [
+        {
+          "code": "def parse(s):\n    try:\n        return int(s)\n    except ValueError:\n        return None\n",
+          "preferred": true,
+          "reason": "Limits the handler to invalid input."
+        },
+        {
+          "code": "def parse(s):\n    try:\n        return int(s)\n    except:\n        return None\n",
+          "preferred": false,
+          "reason": "Still suppresses unrelated exceptions."
+        }
+      ],
+      "family": "exception"
+    },
+    {
+      "id": "eval_literal",
+      "split": "train",
+      "requirement": "Parse a Python literal without evaluating arbitrary code.",
+      "original": "def decode(value):\n    return eval(value)\n",
+      "candidates": [
+        {
+          "code": "import ast\ndef decode(value):\n    return ast.literal_eval(value)\n",
+          "preferred": true,
+          "reason": "Parses literals without evaluating arbitrary expressions."
+        },
+        {
+          "code": "def decode(value):\n    return eval(value)\n",
+          "preferred": false,
+          "reason": "Still evaluates arbitrary expressions."
+        }
+      ],
+      "family": "eval"
+    },
+    {
+      "id": "invalid_patch",
+      "split": "validation",
+      "requirement": "Preserve a syntactically valid function that returns the input.",
+      "original": "def echo(value):\n    return value\n",
+      "candidates": [
+        {
+          "code": "def echo(value):\n    return value\n",
+          "preferred": true,
+          "reason": "The function remains syntactically valid and meets the stated requirement."
+        },
+        {
+          "code": "def echo(value):\n    return (\n",
+          "preferred": false,
+          "reason": "The incomplete replacement is not syntactically valid."
+        }
+      ],
+      "family": "incomplete"
+    }
+  ]
+}

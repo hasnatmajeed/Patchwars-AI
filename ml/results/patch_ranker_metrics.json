@@ -1,0 +1,52 @@
+{
+  "model_version": "synthetic-ranknet-v1",
+  "dataset": "synthetic demonstration only",
+  "dataset_sha256": "f93324a15f869904c2db97bd976b4ed344b3f14a30b28f2cd90879c36a016d19",
+  "provenance": "Original synthetic examples authored for this demonstration; not derived from third-party datasets.",
+  "label_criteria": "Within each group, preference reflects the stated requirement as judged during example construction; labels are not derived from training feature values and are not real-world reliability outcomes.",
+  "groups": 8,
+  "candidates": 16,
+  "train_groups": [
+    "eval_numbers",
+    "subprocess_args",
+    "secret_config",
+    "hash_password",
+    "tempfile",
+    "eval_literal"
+  ],
+  "validation_groups": [
+    "exception",
+    "invalid_patch"
+  ],
+  "train_families": [
+    "eval",
+    "hash",
+    "secret",
+    "subprocess",
+    "tempfile"
+  ],
+  "validation_families": [
+    "exception",
+    "incomplete"
+  ],
+  "group_leakage_detected": false,
+  "train_pairs": 6,
+  "validation_pairs": 2,
+  "seed": 42,
+  "epochs": 500,
+  "hidden_units": 8,
+  "learning_rate": 0.02,
+  "final_training_pairwise_loss": 0.0013681577539684236,
+  "training": {
+    "pairs": 6,
+    "pairwise_accuracy": 1.0,
+    "top1_accuracy": 1.0,
+    "fewer_findings_baseline_accuracy_with_half_ties": 0.8333333333333334
+  },
+  "validation": {
+    "pairs": 2,
+    "pairwise_accuracy": 0.5,
+    "top1_accuracy": 0.5,
+    "fewer_findings_baseline_accuracy_with_half_ties": 0.5
+  }
+}

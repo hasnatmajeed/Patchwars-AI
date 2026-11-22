@@ -23,7 +23,13 @@ build/
 coverage/
 .env
 .env.*
-.env.example
+!.env.example
+*.env
+*.env.*
+credentials.json
+credentials.*
+*.pem
+*.key
 
 # Temporary files
 *.tmp
@@ -31,3 +37,6 @@ coverage/
 
 # Local npm cache
 /.npm-cache/
+
+.browser-verification/
+.test-temp/

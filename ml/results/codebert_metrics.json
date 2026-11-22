@@ -1,0 +1,36 @@
+{
+  "experiment": "exploratory_raw_labels",
+  "label_semantics": "unverified",
+  "evaluation_split": "validation",
+  "labels": [
+    "0",
+    "1"
+  ],
+  "training_examples": 2000,
+  "validation_examples": 1486,
+  "accuracy": 0.8236877523553163,
+  "macro_f1": 0.8053593032905723,
+  "balanced_accuracy": 0.7944972984465835,
+  "confusion_matrix": [
+    [
+      840,
+      29
+    ],
+    [
+      233,
+      384
+    ]
+  ],
+  "configuration": {
+    "model": "microsoft/codebert-base",
+    "seed": 42,
+    "training_limit": 2000,
+    "max_sequence_length": 256,
+    "max_source_chars": 10000,
+    "batch_size": 8,
+    "epochs": 1,
+    "learning_rate": 2e-05,
+    "torch_version": "2.11.0+cu130",
+    "transformers_version": "5.20.2"
+  }
+}

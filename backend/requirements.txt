@@ -4,3 +4,5 @@ python-multipart>=0.0.18,<1
 pytest>=8,<10
 httpx>=0.27,<1
 bandit>=1.7.10,<2
+python-dotenv>=1,<2
+ijson>=3.3,<4
