@@ -5,6 +5,7 @@
 - **Review routing (implemented):** Finding-specific consent opens streamed Defender/Challenger activity; zero-finding exploration remains a separate consented, patch-free path.
 
 - **Scan Results dashboard (implemented):** Actual Bandit findings are grouped by a documented rule mapping, high priority is reported separately, and finding rows retain per-issue review actions. Percentages describe finding proportions, not security likelihood.
+- **Scan Results visual refresh (implemented):** A single panel presents severity counts, three finding-share rows and a coverage row. The primary AI action opens the findings disclosure when the scan has multiple findings and uses the existing consent modal for the chosen issue.
 
 - **Research demo clarity (implemented):** The local model preference and both synthetic code samples are presented first, with raw scores and static details expandable. The demo remains a training example, not an independent validation.
 

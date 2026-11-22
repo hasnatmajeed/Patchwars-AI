@@ -1,9 +1,27 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Link } from './navigation.jsx';
 
-export function MeasuredBar({ label, value, text, tone = 'cyan' }) {
-  if (!Number.isFinite(value) || value < 0 || value > 100) return null;
-  return <div className="measured-bar"><div className="measured-bar-label"><span>{label}</span><strong>{text ?? `${value.toFixed(1)}%`}</strong></div><div className={`measured-track ${tone}`} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Number(value.toFixed(1))} aria-valuetext={text || `${value.toFixed(1)} percent`}><span style={{ '--measured-value': `${value}%` }}/></div></div>;
+const metricIcons = {
+  input: <><path d="M12 3 4 6v6c0 4 3 7 8 9 5-2 8-5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></>,
+  system: <><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m7 9 3 3-3 3m6 0h4"/></>,
+  secrets: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3m-4 5v2"/></>,
+  coverage: <><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5m-18 4 9 5 9-5"/></>,
+  sparkle: <path d="M12 2.5 13.9 8l5.6 1.9-5.6 1.9-1.9 5.6-1.9-5.6L4.5 9.9 10.1 8 12 2.5ZM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z"/>,
+  refresh: <><path d="M20 10a8 8 0 0 0-14-4L3 9m0-5v5h5m-4 5a8 8 0 0 0 14 4l3-3m0 5v-5h-5"/></>,
+};
+
+function ScanIcon({ name }) {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{metricIcons[name]}</svg>;
+}
+
+function ScanMetric({ label, icon, tone, count, total, unit, detail }) {
+  const measured = Number.isInteger(count) && Number.isInteger(total) && total > 0 && count >= 0 && count <= total;
+  const percent = measured ? Number((100 * count / total).toFixed(1)) : null;
+  return <div className={`scan-metric ${tone}`}>
+    <div className="scan-metric-name"><span className="scan-metric-icon"><ScanIcon name={icon}/></span><span>{label}</span></div>
+    {measured && <div className={`measured-track ${tone}`} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-valuetext={`${count} of ${total} ${unit}`}><span style={{ '--measured-value': `${100 * count / total}%` }}/></div>}
+    <div className="scan-metric-reading"><strong>{measured ? `${percent}%` : 'Not assessed'}</strong>{(detail || measured) && <small>{detail || `${count} of ${total} ${unit}`}</small>}</div>
+  </div>;
 }
 
 export function findingSelection(scan, file, finding) {
@@ -35,9 +53,9 @@ export function suggestedSelection(scan, file) {
 
 // Each rule belongs to at most one risk group; severity is an independent measure.
 export const RISK_GROUPS = [
-  { key: 'input', title: 'Input/injection', rules: ['B102', 'B307', 'B608', 'B610', 'B611'], tone: 'amber', description: 'These findings involve input or commands that may be interpreted as code or queries.' },
-  { key: 'system', title: 'System commands', rules: ['B404', 'B602', 'B603', 'B604', 'B605', 'B606', 'B607', 'B609'], tone: 'coral', description: 'These findings involve starting processes or using system commands.' },
-  { key: 'secrets', title: 'Passwords/cryptography', rules: ['B105', 'B106', 'B107', 'B303', 'B304', 'B305', 'B324'], tone: 'cyan', description: 'These findings involve hardcoded passwords or cryptographic choices.' },
+  { key: 'input', title: 'Input & injection', rules: ['B102', 'B307', 'B608', 'B610', 'B611'], tone: 'coral' },
+  { key: 'system', title: 'System commands', rules: ['B404', 'B602', 'B603', 'B604', 'B605', 'B606', 'B607', 'B609'], tone: 'amber' },
+  { key: 'secrets', title: 'Passwords & crypto', rules: ['B105', 'B106', 'B107', 'B303', 'B304', 'B305', 'B324'], tone: 'cyan' },
 ];
 
 export function categorizeFindings(findings) {
@@ -48,10 +66,6 @@ export function categorizeFindings(findings) {
     counts[group?.key || 'other']++;
   }
   return counts;
-}
-
-function CategoryMeasure({ title, count, total, description, tone }) {
-  return <article className="category-measure"><div className="category-measure-head"><h3>{title}</h3><strong>{count} {count === 1 ? 'finding' : 'findings'}</strong></div><p>{description}</p>{total > 0 ? <MeasuredBar label={title} value={100 * count / total} text={`${count} of ${total} findings (${(100 * count / total).toFixed(1)}%)`} tone={tone}/> : null}</article>;
 }
 
 export const ISSUE_NAMES = {
@@ -74,33 +88,87 @@ export function IssueRow({ item, scan, file, onReview, busy }) {
 }
 
 export function ScanReport({ scan, file, onReview, busy = false }) {
+  const findingsPanel = useRef(null);
+  const findingsHeading = useRef(null);
   const findings = scan.findings || [];
   const skipped = scan.skipped || [];
-  const analyzed = scan.scan_status === 'failed' ? '0 files' : scan.scan_type === 'notebook' ? `${scan.analyzed_cells ?? 0} code ${scan.analyzed_cells === 1 ? 'cell' : 'cells'}` : scan.analyzed_source_files != null ? `${scan.analyzed_source_files} of ${scan.eligible_source_files} supported files` : '1 Python file';
-  const analyzedCount = scan.scan_status === 'failed' ? 0 : scan.scan_type === 'notebook' ? (scan.analyzed_cells ?? 0) : scan.analyzed_source_files ?? 1;
-  const counts = findings.reduce((result, item) => { const severity = String(item.severity || '').toUpperCase(); result[severity] = (result[severity] || 0) + 1; return result; }, {});
-  const categories = categorizeFindings(findings);
-  const eligible = scan.eligible_source_files;
+  const failed = scan.scan_status === 'failed';
+  const partial = scan.scan_status === 'partial';
+  const completed = scan.scan_status === 'completed';
+  const filename = scan.filename || file?.name;
   const covered = scan.analyzed_source_files;
-  const coverage = scan.scan_status === 'completed' && Number.isInteger(eligible) && eligible > 0 && Number.isInteger(covered) && covered >= 0 && covered <= eligible ? 100 * covered / eligible : null;
-  const partial = scan.scan_status !== 'completed';
-  const status = scan.scan_status === 'failed' ? 'Scan failed' : partial ? 'Partial scan' : 'Scan complete';
-  const selection = suggestedSelection(scan, file);
-  const first = findings[0];
-  const location = first ? `${first.file_path || file?.name || scan.filename}${first.cell_index != null ? ` · code cell ${first.cell_index + 1}` : ''} · line ${first.line_number}` : selection.source;
-  return <div className="scan-report"><header className="report-header"><div><span className="report-kicker">SECURITY SCAN / RESULTS</span><h1>Your security scan results</h1><p>Results for <strong className="file-name">{file?.name || scan.filename}</strong>.</p></div><span className={`report-status ${partial ? 'is-partial' : ''}`}>{status}</span></header>
-    <section className="report-overview" aria-label="Scan summary"><div className="overview-intro"><span className="overview-icon" aria-hidden="true">⌁</span><div><span className="report-kicker">WHAT WAS CHECKED</span><strong>{analyzed} analyzed</strong><p>{partial ? 'Some content could not be analyzed.' : 'All supported content in this scan was analyzed.'}</p></div></div><div className="overview-facts"><div><strong>{scan.total_findings}</strong><span>{scan.total_findings === 1 ? 'finding' : 'findings'}</span></div><div><strong>{counts.HIGH || 0} <small>high</small> · {counts.MEDIUM || 0} <small>medium</small> · {counts.LOW || 0} <small>low</small>{findings.length - (counts.HIGH || 0) - (counts.MEDIUM || 0) - (counts.LOW || 0) > 0 && <> · {findings.length - (counts.HIGH || 0) - (counts.MEDIUM || 0) - (counts.LOW || 0)} <small>other</small></>}</strong><span>Reported severity</span></div><div><strong>{skipped.length}</strong><span>Skipped items</span></div></div></section>
-    {findings.length > 0 ? <section className="scan-dashboard" aria-label="Security overview"><div className="dashboard-heading"><div><span className="report-kicker">FINDINGS AT A GLANCE</span><h2>Security overview</h2></div><p>Percentages show a share of reported findings, not the chance that code is secure or vulnerable.</p></div><div className="dashboard-grid">
-      <h3 className="dashboard-group-title">Security priority</h3>
-      {['HIGH', 'MEDIUM', 'LOW'].map(severity => <CategoryMeasure key={severity} title={`${severity[0]}${severity.slice(1).toLowerCase()} severity`} count={counts[severity] || 0} total={findings.length} tone="coral" description="Share of reported findings."/>)}
-      <h3 className="dashboard-group-title">Issue types</h3>
-      {RISK_GROUPS.map(group => <CategoryMeasure key={group.key} title={group.title} count={categories[group.key]} total={findings.length} tone={group.tone} description={group.description}/>)}
-      {categories.other > 0 && <CategoryMeasure title="Other" count={categories.other} total={findings.length} tone="cyan" description="Other reported rules."/>}
-      <article className="category-measure"><div className="category-measure-head"><h3>Scan coverage</h3></div>{coverage === null ? <p>Coverage not available for this scan.</p> : <MeasuredBar label="Supported files analyzed" value={coverage} text={Number.isInteger(eligible) && eligible > 0 ? `${covered} of ${eligible} supported files (${coverage.toFixed(1)}%)` : `${coverage.toFixed(1)}% of supported source`}/>}<p>Coverage describes analyzed source, not security.</p></article>
-      <article className="category-measure"><div className="category-measure-head"><h3>Runtime errors</h3><strong>Not tested</strong></div><p>Static scanning does not run your code or test its behavior.</p></article>
-    </div><p className="dashboard-note">Severity and issue type are separate measures. Each finding appears in one issue type; {categories.other} {categories.other === 1 ? 'finding uses' : 'findings use'} an unlisted rule. See the category mapping in the project README.</p></section> : <section className="scan-dashboard zero-coverage" aria-label="Scan coverage"><h2>Scan coverage</h2>{coverage === null ? <p>Coverage not available for this scan.</p> : <MeasuredBar label="Supported files analyzed" value={coverage} text={`${covered} of ${eligible} supported files (${coverage.toFixed(1)}%)`}/>}<p>Runtime errors: Not tested.</p></section>}
-    {partial && <section className="coverage-notice" role="status"><span className="coverage-mark" aria-hidden="true">!</span><div><h2>Some parts could not be analyzed.</h2><p>The results cover only {analyzed}. Skipped content is not considered clean. Notebook magic, shell commands and non-Python cells cannot be analyzed as Python.</p>{skipped.length > 0 && <details><summary>See what was skipped ({skipped.length})</summary><ul>{skipped.map((item, index) => <li key={index}><strong>{item.path}{item.cell_index != null ? ` · code cell ${item.cell_index + 1}` : ''}</strong><span>{item.reason}</span></li>)}</ul></details>}</div></section>}
-    {findings.length === 0 ? <section className="zero-notice"><span className="zero-mark" aria-hidden="true">{analyzedCount ? '✓' : '!'}</span><div className="zero-content"><div className="zero-copy"><h2>{analyzedCount ? 'No security issues were reported in the code that was analyzed.' : 'No supported code was analyzed.'}</h2><p>{analyzedCount ? 'This does not guarantee the code is secure.' : 'There is no scan result to assess. Check the skipped items or try another file.'}{partial && analyzedCount ? ' Some content was not analyzed.' : ''}</p>{selection.source && <p>Optional exploration covers one analyzed source unit ({selection.source}); it is not a fix for a detected issue.</p>}<div className="zero-actions"><Link className="button secondary" to="/scan">Scan another file →</Link></div></div>{selection.source && <button type="button" className="button zero-ai-action" disabled={busy} onClick={() => onReview(selection.source, null)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2.5 13.9 8l5.6 1.9-5.6 1.9-1.9 5.6-1.9-5.6L4.5 9.9 10.1 8 12 2.5ZM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z"/></svg><span>Explore this code with AI</span></button>}</div></section> : <section className="source-section"><div className="source-heading"><span className="report-kicker">REPORTED ISSUES</span><h2>What the scan found</h2><p>Choose an issue to review. Each finding is a potential issue, not a confirmed vulnerability.</p></div><div className="source-card issue-list">{findings.map((item, index) => <IssueRow key={`${item.file_path || ''}-${item.cell_index ?? ''}-${item.line_number}-${item.test_id}-${index}`} item={item} scan={scan} file={file} onReview={onReview} busy={busy}/>)}</div><p className="muted">AI review sends only the selected bounded code region after you give consent.</p></section>}
+  const analyzed = failed ? 0 : scan.scan_type === 'notebook' ? (scan.analyzed_cells ?? 0) : covered ?? (completed && !scan.findings_by_file ? 1 : 0);
+  const unit = scan.scan_type === 'notebook' ? 'code cell' : 'file';
+  const counts = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+  for (const finding of findings) {
+    const severity = String(finding.severity || '').toUpperCase();
+    if (Object.hasOwn(counts, severity)) counts[severity]++;
+  }
+  const categories = categorizeFindings(findings);
+  const hasReviewableFinding = !failed && findings.some(finding => findingSelection(scan, file, finding));
+  const exploration = !findings.length && analyzed > 0 ? suggestedSelection(scan, file).source : '';
 
+  function startReview() {
+    if (!findings.length) {
+      onReview(exploration, null);
+    } else if (findings.length === 1) {
+      const selection = findingSelection(scan, file, findings[0]);
+      if (selection) onReview(selection.source, selection.line, selection.rule);
+    } else {
+      findingsPanel.current.open = true;
+      findingsHeading.current.focus();
+    }
+  }
+
+  return <div className="scan-report">
+    <header className="scan-results-heading">
+      <h1>Your security scan results</h1>
+      <p>{filename}</p>
+    </header>
+
+    <section className="scan-results-panel" aria-label="Scan summary">
+      <div className="scan-severity-badges" aria-label="Reported severity">
+        <span className="scan-severity-label">Findings</span>
+        {['High', 'Medium', 'Low'].map(label => <span key={label} className={`severity ${label.toLowerCase()}`}><span>{label}</span><strong>{counts[label.toUpperCase()]}</strong></span>)}
+      </div>
+      {partial && <p className="scan-results-status" role="status">Partial scan · {skipped.length ? `${skipped.length} skipped ${skipped.length === 1 ? 'item' : 'items'}` : 'Some content could not be analyzed'}</p>}
+      {failed && <p className="scan-results-status" role="status">Scan failed</p>}
+
+      <div className="scan-metrics">
+        {RISK_GROUPS.map(group => <ScanMetric key={group.key} icon={group.key} label={group.title} tone={group.tone}
+          count={categories[group.key]} total={failed ? 0 : findings.length} unit="findings"/>)}
+        <ScanMetric icon="coverage" label="Coverage" tone="mint" count={completed ? covered : null}
+          total={scan.eligible_source_files} unit="supported files"
+          detail={!completed || covered == null ? `${analyzed} ${unit}${analyzed === 1 ? '' : 's'} analyzed` : undefined}/>
+      </div>
+
+      {!findings.length && !failed && <p className="scan-results-note">{analyzed
+        ? 'No security issues were reported in the code that was analyzed. This does not guarantee the code is secure.'
+        : 'No supported code was analyzed.'}</p>}
+      {categories.other > 0 && <p className="scan-results-note">{categories.other} {categories.other === 1 ? 'finding uses' : 'findings use'} an unlisted rule.</p>}
+
+      <div className="scan-results-actions">
+        <button type="button" className="button primary scan-results-review" disabled={busy || (!hasReviewableFinding && !exploration)} onClick={startReview}>
+          <ScanIcon name="sparkle"/>{findings.length || !exploration ? 'Review with AI' : 'Explore this code with AI'}
+        </button>
+        <Link className="button secondary" to="/scan"><ScanIcon name="refresh"/>Scan another file</Link>
+      </div>
+    </section>
+
+    <details className="scan-findings" ref={findingsPanel}>
+      <summary>View scan findings <span>{findings.length}</span></summary>
+      <div className="scan-findings-body">
+        {findings.length > 0 ? <>
+          <h2 tabIndex={-1} ref={findingsHeading}>Choose a finding to review</h2>
+          <p className="muted">AI review sends the selected bounded code region after you give consent.</p>
+          <div className="source-card issue-list">{findings.map((item, index) => <IssueRow key={index} item={item} scan={scan} file={file} onReview={onReview} busy={busy || failed}/>)}</div>
+        </> : <p className="muted">{analyzed ? 'No findings to display.' : 'No scan findings are available.'}</p>}
+        <p className="muted">Runtime errors and code quality · Not assessed</p>
+        {skipped.length > 0 && <section className="scan-skipped" aria-label="Skipped items">
+          <h2>Skipped items ({skipped.length})</h2>
+          <ul>{skipped.map((item, index) => <li key={index}><strong>{item.path}{item.cell_index != null ? ` · code cell ${item.cell_index + 1}` : ''}</strong><span>{item.reason}</span></li>)}</ul>
+        </section>}
+      </div>
+    </details>
   </div>;
 }

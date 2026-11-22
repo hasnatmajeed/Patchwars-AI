@@ -138,19 +138,22 @@ test('scan report explains zero findings and incomplete notebook coverage', asyn
   assert.match(markup, /No security issues were reported in the code that was analyzed/);
   assert.match(markup, /does not guarantee the code is secure/); assert.match(markup, /Partial scan/);
   assert.match(markup, /code cell 2/); assert.match(markup, /magic or shell syntax/);
-  assert.match(markup, /Explore this code with AI/); assert.match(markup, /not a fix for a detected issue/);
+  assert.match(markup, /Explore this code with AI/); assert.doesNotMatch(markup, /Review with AI/);
   assert.doesNotMatch(markup, /Review code cell with AI/);
 });
 
 test('measured scan bars use real totals and omit unmeasurable coverage', async () => {
-  const { ScanReport, MeasuredBar } = await server.ssrLoadModule('/src/scan-report.jsx');
+  const { ScanReport } = await server.ssrLoadModule('/src/scan-report.jsx');
   const scan = { filename: 'p.zip', scan_type: 'zip_project', scan_status: 'completed', total_findings: 3,
-    findings: [{severity: 'HIGH'}, {severity: 'HIGH'}, {severity: 'LOW'}], eligible_source_files: 2, analyzed_source_files: 2 };
+    findings: [{severity: 'HIGH', test_id: 'B307'}, {severity: 'HIGH', test_id: 'B608'}, {severity: 'LOW', test_id: 'B324'}], eligible_source_files: 2, analyzed_source_files: 2 };
   const render = value => renderToStaticMarkup(React.createElement(ScanReport, { scan: value, file: {name:'p.zip'}, onReview:noop }));
   const markup = render(scan);
-  assert.match(markup, /2 of 3 findings \(66\.7%\)/); assert.match(markup, /0 of 3 findings \(0\.0%\)/);
-  assert.match(markup, /aria-valuenow="100"/); assert.match(render({...scan, scan_status:'partial'}), /Coverage not available/);
-  assert.equal(renderToStaticMarkup(React.createElement(MeasuredBar, {label:'invalid', value:NaN})), '');
+  assert.match(markup, /aria-valuenow="66.7" aria-valuetext="2 of 3 findings"/);
+  assert.match(markup, /aria-valuenow="0" aria-valuetext="0 of 3 findings"/);
+  assert.match(markup, /aria-label="Coverage"[^>]*aria-valuenow="100" aria-valuetext="2 of 2 supported files"/);
+  for (const change of [{scan_status:'partial'}, {eligible_source_files:0}, {analyzed_source_files:3}, {analyzed_source_files:null}]) {
+    assert.doesNotMatch(render({...scan, ...change}), /role="progressbar" aria-label="Coverage"/);
+  }
 });
 
 test('relative neural scores handle negatives and ties without reliability claims', async () => {
@@ -200,7 +203,8 @@ test('unified ZIP findings use one automatic bounded review and list coverage ho
   assert.deepEqual(suggestedSelection(scan, { name: 'p.zip' }), { source: 'src/a.py', line: 8 });
   const report = renderToStaticMarkup(React.createElement(ScanReport, { scan, file: { name: 'p.zip' }, onReview: noop }));
   assert.match(report, /First issue/); assert.match(report, /Second issue/); assert.doesNotMatch(report, /empty.py/);
-  assert.equal((report.match(/>Review with AI<\/button>/g) || []).length, 2); assert.match(report, /selected bounded code region/);
+  assert.equal((report.match(/>Review with AI<\/button>/g) || []).length, 3); assert.match(report, /selected bounded code region/);
+  assert.match(report, /<details class="scan-findings"><summary>View scan findings/);
   const review = { filename: 'p.zip', selected_file: 'src/a.py', original_code: 'x=1', review_status: 'complete',
     scope: { kind: 'finding', start_line: 5, end_line: 10, finding_line: 8, cell_index: null },
     bandit_before: [{ ...findings[0], line_number: 4 }], rounds: [{ round: 1, proposed_code: 'x=2', defender_explanation: 'Change.', challenger_feedback: 'Review.', suggested_tests: [], bandit_after: [] }] };
@@ -920,18 +924,17 @@ test('risk dashboard categorizes actual Bandit IDs without overlapping risk grou
   assert.deepEqual(categorizeFindings(findings), {input:2,system:2,secrets:2,other:1,high:2});
   const scan = {filename:'source.py',scan_status:'completed',total_findings:7,findings};
   const html = renderToStaticMarkup(React.createElement(ScanReport,{scan,file:{name:'source.py'},onReview:noop}));
-  assert.match(html,/2 of 7 findings \(28\.6%\)/); assert.match(html,/1 finding uses an unlisted rule/);
-  assert.match(html,/Severity and issue type are separate/); assert.match(html,/not the chance that code is secure or vulnerable/);
-  assert.match(html,/Runtime errors/); assert.match(html,/Not tested/);
+  assert.match(html,/aria-valuenow="28.6" aria-valuetext="2 of 7 findings"/); assert.match(html,/1 finding uses an unlisted rule/);
+  assert.match(html,/Runtime errors and code quality · Not assessed/);
 });
 
 test('zero and partial findings avoid fabricated percentages and preserve skip details', async () => {
   const {ScanReport} = await server.ssrLoadModule('/src/scan-report.jsx');
   const scan = {filename:'n.ipynb',scan_type:'notebook',scan_status:'partial',analyzed_cells:0,findings:[],total_findings:0,skipped:[{path:'n.ipynb',cell_index:2,reason:'Cell could not be analyzed.'}]};
   const html = renderToStaticMarkup(React.createElement(ScanReport,{scan,file:{name:'n.ipynb'},onReview:noop}));
-  assert.match(html,/No supported code was analyzed/); assert.match(html,/Coverage not available/);
+  assert.match(html,/No supported code was analyzed/); assert.match(html,/Not assessed/);
   assert.match(html,/code cell 3/); assert.match(html,/Cell could not be analyzed/);
-  assert.doesNotMatch(html,/role="progressbar"/); assert.match(html,/Not tested/);
+  assert.doesNotMatch(html,/role="progressbar"/);
 });
 
 test('finding row shows fallback details, location and invokes the correct review', async () => {
@@ -949,7 +952,7 @@ test('finding row shows fallback details, location and invokes the correct revie
 test('scan dashboard stacks on mobile and honors reduced motion', async () => {
   const {readFileSync} = await import('node:fs');
   const css=readFileSync(new URL('./src/style.css',import.meta.url),'utf8');
-  assert.match(css, /@media\(max-width:720px\)\{\.scan-report \.scan-dashboard/);
+  assert.match(css, /\.scan-results-actions \{ flex-direction: column/);
   assert.match(css, /\.scan-report \.issue-row\{grid-template-columns:minmax\(0,1fr\)/);
   assert.match(css, /\.scan-report \.issue-action \.button\{width:100%\}/);
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\.scan-report \.measured-track>span\{animation:none\}/);
@@ -975,8 +978,9 @@ test('final review: readable findings and dynamic severity and type proportions'
   const ids = ['B307','B608','B404','B602','B105','B324'];
   const findings = ids.map((test_id,i) => ({test_id,line_number:i+1,severity:i<3?'HIGH':i<5?'MEDIUM':'LOW',description:'Finding'}));
   const html = renderToStaticMarkup(React.createElement(ScanReport,{scan:{filename:'a.py',scan_status:'completed',total_findings:6,findings},file:{name:'a.py'},onReview:noop}));
-  assert.match(html,/3 of 6 findings \(50\.0%\)/); assert.match(html,/2 of 6 findings \(33\.3%\)/); assert.match(html,/1 of 6 findings \(16\.7%\)/);
-  assert.match(html,/Security priority/); assert.match(html,/Issue types/); assert.match(html,/<summary>Technical details<\/summary>/);
+  assert.match(html,/<span>High<\/span><strong>3<\/strong>/); assert.match(html,/<span>Medium<\/span><strong>2<\/strong>/); assert.match(html,/<span>Low<\/span><strong>1<\/strong>/);
+  assert.equal((html.match(/aria-valuenow="33.3" aria-valuetext="2 of 6 findings"/g) || []).length, 3);
+  assert.match(html,/<summary>Technical details<\/summary>/);
 });
 
 test('final review: scoped viewer fallback and static comparison are honest', async () => {
@@ -1073,9 +1077,9 @@ test('partial zero-finding notebook shows compact coverage without invented bars
   const {ScanReport}=await server.ssrLoadModule('/src/scan-report.jsx');
   const scan={filename:'Assignment_week5.ipynb',scan_type:'notebook',scan_status:'partial',analyzed_cells:106,findings:[],total_findings:0,findings_by_file:{},review_targets:{},skipped:[{path:'Assignment_week5.ipynb',cell_index:107,reason:'Cell could not be analyzed.'}]};
   const html=renderToStaticMarkup(React.createElement(ScanReport,{scan,file:{name:scan.filename},onReview:noop}));
-  assert.match(html,/106 code cells analyzed/); assert.match(html,/Partial scan/); assert.match(html,/1<\/strong><span>Skipped items/);
+  assert.match(html,/106 code cells analyzed/); assert.match(html,/Partial scan · 1 skipped item/);
   assert.match(html,/No security issues were reported in the code that was analyzed/); assert.match(html,/does not guarantee/);
-  assert.match(html,/Cell could not be analyzed/); assert.match(html,/Coverage not available/); assert.doesNotMatch(html,/role="progressbar"|Security priority|Issue types/);
+  assert.match(html,/Cell could not be analyzed/); assert.match(html,/Not assessed/); assert.doesNotMatch(html,/role="progressbar"/);
 });
 
 test('exploratory results use the same real suggestions in summary and details without patch UI', async () => {

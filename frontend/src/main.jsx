@@ -119,7 +119,8 @@ function CodePage({ state }) {
 
 function Workspace({ path, state }) {
   const Page = { '/scan': ScanPage, '/results': ResultsPage, '/ai-review': AIPage, '/code-review': CodePage }[path];
-  return <main className="site-wrap workspace"><StepNav path={path}/><Page state={state}/></main>;
+  const showDashboard = path === '/results' && !!state.scan;
+  return <main className={`site-wrap workspace${showDashboard ? ' scan-results-workspace' : ''}`}>{!showDashboard && <StepNav path={path}/>}<Page state={state}/></main>;
 }
 export async function executeScan(file, guard, callbacks, send = requestScan) {
   if (!file || guard.current) return;
