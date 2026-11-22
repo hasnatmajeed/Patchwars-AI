@@ -90,7 +90,31 @@ function ResultsPage({ state }) {
     setModalFinding(line == null ? null : { line, rule }); setExploreSource(name);
   }
   const target = state.scan.review_targets?.[exploreSource];
-  return <><ScanReport scan={state.scan} file={state.file} selected={state.selected} selectedLine={state.selectedLine} onReview={review} busy={!!state.busy}/>{exploreSource && <div className="explore-modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) closeModal(); }}><section className="explore-modal" role="dialog" aria-modal="true" aria-labelledby="explore-modal-title" aria-describedby="explore-modal-description" tabIndex={-1} ref={dialogRef} onKeyDown={onDialogKeyDown}><h2 id="explore-modal-title">{modalFinding ? 'Review finding with AI' : 'Explore with AI'}</h2><p id="explore-modal-description">{modalFinding ? 'Review a proposed security fix with Defender and Challenger.' : 'Get an AI-powered review of your selected code.'}</p><p className="explore-modal-file">{target?.path || exploreSource}{target?.cell_index != null ? ` · code cell ${target.cell_index + 1}` : ''}{modalFinding ? ` · line ${modalFinding.line} · ${modalFinding.rule}` : ''}</p><label className="explore-consent"><input type="checkbox" checked={modalConsent} disabled={reviewing} onChange={event => setModalConsent(event.target.checked)}/><span>I allow AI to review my selected code.<small>Selected code will be sent to an external AI service.</small></span></label>{modalFinding && <label className="explore-consent"><input type="checkbox" checked={modalRefine} disabled={reviewing} onChange={event => setModalRefine(event.target.checked)}/><span>Try a second fix (optional)<small>Refinement uses additional provider calls.</small></span></label>}{state.reviewError && <p className="explore-modal-error" role="alert">{providerError(state.reviewError.category, state.reviewError.message).message}</p>}{reviewing && <p className="explore-modal-loading" role="status">Reviewing your code...</p>}<div className="explore-modal-actions"><button type="button" className="button secondary" onClick={closeModal} disabled={reviewing}>Cancel</button><button type="button" className="button primary" disabled={!modalConsent || reviewing} onClick={() => modalFinding ? state.runFindingReview(exploreSource, modalFinding, modalConsent, modalRefine) : state.runExploratoryReview(exploreSource, modalConsent)}>{reviewing ? 'Reviewing...' : 'Start AI Review'}</button></div></section></div>}</>;
+  return <>
+    <ScanReport scan={state.scan} file={state.file} selected={state.selected} selectedLine={state.selectedLine} onReview={review} busy={!!state.busy}/>
+    {exploreSource && <div className="explore-modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) closeModal(); }}>
+      <section className={modalFinding ? 'explore-modal finding-review-modal' : 'explore-modal'} role="dialog" aria-modal="true" aria-labelledby="explore-modal-title" aria-describedby={modalFinding ? 'explore-modal-file finding-review-disclosure' : 'explore-modal-description'} tabIndex={-1} ref={dialogRef} onKeyDown={onDialogKeyDown}>
+        <h2 id="explore-modal-title">{modalFinding ? 'Review finding with AI' : 'Explore with AI'}</h2>
+        {!modalFinding && <p id="explore-modal-description">Get an AI-powered review of your selected code.</p>}
+        <p id="explore-modal-file" className="explore-modal-file">{target?.path || exploreSource}{target?.cell_index != null ? ` · code cell ${target.cell_index + 1}` : ''}{modalFinding ? ` · line ${modalFinding.line} · ${modalFinding.rule}` : ''}</p>
+        {modalFinding && <p id="finding-review-disclosure" className="finding-review-disclosure">AI review uses a third-party provider.</p>}
+        <label className="explore-consent">
+          <input type="checkbox" checked={modalConsent} disabled={reviewing} onChange={event => setModalConsent(event.target.checked)}/>
+          {modalFinding ? <span>I agree to AI review of my selected code.</span> : <span>I allow AI to review my selected code.<small>Selected code will be sent to an external AI service.</small></span>}
+        </label>
+        {modalFinding && <label className="explore-consent">
+          <input type="checkbox" checked={modalRefine} disabled={reviewing} onChange={event => setModalRefine(event.target.checked)}/>
+          <span>Try a second fix (optional)</span>
+        </label>}
+        {state.reviewError && <p className="explore-modal-error" role="alert">{providerError(state.reviewError.category, state.reviewError.message).message}</p>}
+        {reviewing && <p className="explore-modal-loading" role="status">Reviewing your code...</p>}
+        <div className="explore-modal-actions">
+          <button type="button" className="button secondary" onClick={closeModal} disabled={reviewing}>Cancel</button>
+          <button type="button" className="button primary" disabled={!modalConsent || reviewing} onClick={() => modalFinding ? state.runFindingReview(exploreSource, modalFinding, modalConsent, modalRefine) : state.runExploratoryReview(exploreSource, modalConsent)}>{reviewing ? 'Reviewing...' : 'Start AI Review'}</button>
+        </div>
+      </section>
+    </div>}
+  </>;
 }
 function AIPage({ state }) {
   if (!hasReviewFile(state.file)) return <section className="empty-page" role="alert"><h1>Scan a file first</h1><p>{MISSING_REVIEW_FILE}</p><Link className="button primary" to="/scan">Select a file</Link></section>;
