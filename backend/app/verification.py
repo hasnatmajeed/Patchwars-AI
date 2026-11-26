@@ -7,6 +7,14 @@ from typing import Any
 from .ai_agents import MAX_SOURCE_BYTES
 
 
+def code_structure(source: str) -> str:
+    """Compare Python structure without whitespace, comments or source positions."""
+    try:
+        return ast.dump(ast.parse(source, type_comments=True), include_attributes=False)
+    except (SyntaxError, ValueError, RecursionError, MemoryError):
+        return source
+
+
 def verify_patch(original: str, proposed: str, original_findings: list[dict[str, Any]] | None,
                  proposed_findings: list[dict[str, Any]] | None,
                  target: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -44,6 +52,8 @@ def verify_patch(original: str, proposed: str, original_findings: list[dict[str,
         report['syntax_valid'] = False
         return report
     report['syntax_valid'] = True
+    changed = changed and code_structure(original) != code_structure(proposed)
+    report['code_changed'] = changed
     if target is not None:
         try:
             old_tree = ast.parse(original)
@@ -66,10 +76,14 @@ def verify_patch(original: str, proposed: str, original_findings: list[dict[str,
     def identity(finding: dict[str, Any]) -> tuple[Any, ...]:
         return (finding['test_id'], finding['line_number'], finding['description'])
 
+    line_matches = SequenceMatcher(None, original.splitlines(), proposed.splitlines()).get_matching_blocks()
+    old_lines_by_new = {new + offset + 1: old + offset + 1
+                        for old, new, size in line_matches for offset in range(size)}
     available = Counter(identity(f) for f in original_findings)
     remaining, introduced = [], []
     for finding in proposed_findings:
-        key = identity(finding)
+        rule, line, description = identity(finding)
+        key = rule, old_lines_by_new.get(line, line), description
         if available[key]:
             remaining.append(finding)
             available[key] -= 1

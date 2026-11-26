@@ -117,6 +117,8 @@ Create a project-root `.env` by copying `.env.example` and fill in `AI_BASE_URL`
 
 To diagnose OpenRouter credentials, run `.\.venv\Scripts\python.exe scripts\check_ai_config.py`. It reports configuration status and key length without printing the key, then checks OpenRouter's key endpoint when the configured base URL or key identifies OpenRouter. A successful key check does not verify model access or chat completions. The diagnostic reads the same effective settings as the backend; values from `.env` are not copied into PowerShell environment variables.
 
+With `AI_MODEL=openrouter/free` on OpenRouter, Defender requests a strict JSON schema and requires a route that supports the request parameters. The context window and completion limits depend on the upstream model and provider chosen for each request. Reload the backend to pick up the revised Defender request. [OpenRouter free router](https://openrouter.ai/openrouter/free) · [Structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs)
+
 ```powershell
 Set-Location 'E:\PatchWars Ai'
 .\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
@@ -142,7 +144,9 @@ Missing consent or invalid uploads return 400/413/415; missing or invalid provid
 
 Defender syntax failures use the safe `invalid_python` category; missing or invalid required fields use `schema_validation`. Round-two failures are labeled with a `round2_` stage in diagnostics. Syntax validation cannot establish that a scoped replacement is complete, behaviorally correct, or secure.
 
-Round 2 Defender receives the original source scope, the target finding, Patch 1, Challenger feedback, and a compact static verification summary. Its two prompt messages have a combined 24,000-byte limit. If the provider reports a length stop, the review retains Patch 1 and leaves ranking unavailable when only one candidate qualifies. Local diagnostics record the requested output cap, prompt size, and token counts when the provider supplies them.
+Defender receives the complete selected source scope and the target finding's Bandit rule, description and scope-relative line. Round 2 adds Patch 1, Challenger feedback and a compact static verification summary, with a combined 24,000-byte limit for its two prompt messages. On a length stop in either round, local diagnostics record the requested output cap, prompt size and available prompt, completion and reasoning token counts. A Round 2 length stop preserves Patch 1 and leaves ranking unavailable when only one candidate qualifies.
+
+Round 2 asks for a behavior-preserving alternative or an improvement tied to Challenger feedback, even if Patch 1 clears Bandit. Formatting and comment-only changes do not count as new proposals. The verifier matches findings on unchanged lines that move after an edit. Code Review highlights the trained model's preferred eligible patch and shows model scores with relative bars. The comparison button opens that patch when the model returns a unique winner.
 
 The review screen distinguishes authentication or access denial, billing, quota, rate limits, timeout, invalid output and unavailable-provider errors. A 429 is classified as quota exhaustion only when a bounded, uncompressed error body contains a recognized quota or credit marker; otherwise it remains a rate limit. Explicit quota and billing failures are not retried automatically. Replacing a key means updating local configuration and restarting the backend; do not paste credentials into the interface.
 

@@ -114,6 +114,7 @@ export function staticOutcome(before, after, verification) {
 
 export function proposalStatus(round, original, rounds) {
   if (typeof original !== 'string' || typeof round?.proposed_code !== 'string') return 'unavailable';
+  if (['unchanged', 'duplicate'].includes(round.candidate_assessment?.proposal_status)) return round.candidate_assessment.proposal_status;
   if (round.proposed_code === original) return 'unchanged';
   if (rounds.some(other => other.round < round.round && other.proposed_code === round.proposed_code)) return 'duplicate';
   return 'changed';
@@ -146,9 +147,9 @@ export function PatchOverview({ review, onInspect, onCompare, backLink }) {
       <div className="ranker-hero-body"><div><h3>{title}</h3><p>{ranking.status === 'preferred' ? 'The experimental model ranked this patch above the other available options.' : ranking.status === 'tie' ? 'The model reports no unique preference.' : 'The model can compare distinct eligible patches when ranking results are available.'}</p></div>
       {ranking.candidates.length > 0 && <div className="ranker-scores" aria-label="Model preference scores">
         {[...ranking.candidates].sort((a, b) => a.round - b.round).map(candidate => <div className={`ranker-score${ranking.winner === candidate.round ? ' is-preferred' : ''}`} key={candidate.round}>
-          <strong>Patch {candidate.round}</strong><div className="ranker-score-track" aria-hidden="true"><span style={{width: candidate.position == null ? '50%' : `${candidate.position * 100}%`}}/></div><span className="ranker-score-value">Score {candidate.score}</span>
+          <strong>Patch {candidate.round}</strong><div className="ranker-score-track" aria-hidden="true"><span style={{width: candidate.position == null ? '50%' : `${20 + candidate.position * 65}%`}}/></div><span className="ranker-score-value" title={String(candidate.score)}>Score {Number(candidate.score.toPrecision(5))}</span>
         </div>)}
-        <p>Raw model scores. Bars show relative positions.</p>
+        <p>Model scores · Bars show relative preference.</p>
       </div>}</div>
     </section>
     {rounds.length > 0 && <section className="patch-cards" aria-label="Patch proposals">{rounds.map(round => {
@@ -168,7 +169,7 @@ export function PatchOverview({ review, onInspect, onCompare, backLink }) {
       </article>;
     })}</section>}
     {review.refinement_status === 'partial' && <p className="patch-partial" role="status">The second review did not complete. Available proposals are shown.</p>}
-    <div className="patch-actions"><button type="button" className="button primary patch-primary" onClick={onCompare} disabled={!rounds.length}>View Original &amp; Proposed Code</button>{backLink}</div>
+    <div className="patch-actions"><button type="button" className="button primary patch-primary" onClick={() => onCompare(ranking.winner)} disabled={!rounds.length}>View Original &amp; Proposed Code</button>{backLink}</div>
     <p className="patch-safety">Review and test before using. The patch has not been applied.</p>
     <details className="patch-technical"><summary>Technical details</summary><p>Model status: {review.neural_ranking?.status || 'unavailable'}.</p><p>Review rounds completed: {rounds.filter(round => round.round_status !== 'partial').length} · Distinct changed proposals: {changedCount ?? 'Unavailable'} · Distinct eligible patches: {eligibleCount ?? 'Unavailable'}</p><p>Static analysis and model preference do not establish security or functional correctness. Tests were not executed.</p>{review.refinement_error && <p>{review.refinement_error}</p>}<CandidateEligibility rounds={rounds}/></details>
   </div>;

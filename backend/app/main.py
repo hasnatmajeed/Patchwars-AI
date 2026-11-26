@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 
 from .scanner import ScanError, ScanTimeout, scan_python
 from . import ai_agents
-from .verification import verify_patch
+from .verification import code_structure, verify_patch
 from .source_units import MAX_CONTEXT_BYTES, MAX_PREVIEW_BYTES, SourceError, finding_scope, notebook_cells, reconstruct_source
 from .patch_ranker import rank_candidates
 from .ranker_demo import DemoUnavailable, research_demo
@@ -507,13 +507,14 @@ async def run_ai_review(request: Request, progress: Callable[[str], Awaitable[No
             ai_agents.log_failure('round2_' + stage, exc.category)
             refinement_status, refinement_error = 'partial', f'Second-round {stage.replace("_", " ")}: {exc}'
             refinement_failure = {'stage': stage, 'category': exc.category, 'message': refinement_error}
-    eligible = [r for r in rounds if r['verification']['verification_status'] == 'static_improvement']
+    first_structure = code_structure(rounds[0]['proposed_code'])
     for r in rounds:
         v = r['verification']
         reasons = []
+        duplicate = r['round'] > 1 and code_structure(r['proposed_code']) == first_structure
         if not v.get('code_changed'):
             reasons.append('unchanged_from_original')
-        if r['round'] > 1 and r['proposed_code'] == rounds[0]['proposed_code']:
+        if duplicate:
             reasons.append('identical_to_round_one')
         if v.get('syntax_valid') is not True:
             reasons.append('invalid_or_unchecked_syntax')
@@ -524,9 +525,11 @@ async def run_ai_review(request: Request, progress: Callable[[str], Awaitable[No
         if v.get('unrelated_change_possible') is True:
             reasons.append('possible_unrelated_change')
         proposal_status = ('unchanged' if not v.get('code_changed') else
-                           'duplicate' if r['round'] > 1 and r['proposed_code'] == rounds[0]['proposed_code'] else 'changed')
-        r['candidate_assessment'] = {'proposal_status': proposal_status, 'different_from_round_one': r['round'] > 1 and r['proposed_code'] != rounds[0]['proposed_code'],
+                           'duplicate' if duplicate else 'changed')
+        r['candidate_assessment'] = {'proposal_status': proposal_status, 'different_from_round_one': r['round'] > 1 and not duplicate,
                                      'ranking_eligible': not reasons, 'reasons': reasons}
+    eligible = [r for r in rounds if r['verification']['verification_status'] == 'static_improvement'
+                and r['candidate_assessment']['ranking_eligible']]
     candidate = min(eligible, key=lambda r: (r['verification']['proposed_finding_count'], r['round'])) if eligible else None
     return {'filename': filename, 'selected_file': selected_path, 'scope': scope, 'original_code': source, 'full_original_sha256': hashlib.sha256(data).hexdigest(), 'full_original_code': full_source if len(data) <= MAX_PREVIEW_BYTES else None,
             'original_findings': before, 'proposed_code': patch['proposed_code'],

@@ -132,12 +132,13 @@ function CodePage({ state }) {
       state.setCodeTarget('');
     }
   }, [state.codeTarget]);
-  const showCode = () => {
+  const showCode = round => {
+    if (round != null) state.setRound(round);
     const comparison = document.getElementById('code-comparison');
     comparison?.focus({ preventScroll: true });
     comparison?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   };
-  const inspect = round => { state.setRound(round); showCode(); };
+  const inspect = showCode;
   return <div className="code-review-page"><PageTitle eyebrow="STEP 04 – CODE REVIEW" title="Compare the patches" text="See which patch the model prefers, compare the code, and review the changes."/>{state.review ? <><PatchOverview review={state.review} onInspect={inspect} onCompare={showCode} backLink={<Link className="button secondary patch-back" to="/ai-review/results">Back to AI Review</Link>}/><section className="panel code-section review-comparison-view" id="code-comparison" aria-labelledby="code-comparison-heading" tabIndex={-1}><h2 id="code-comparison-heading">Original &amp; Proposed Code</h2><CodeReview review={state.review} selectedRound={state.round} setSelectedRound={state.setRound}/></section></> : <section className="empty-page"><h2>No proposal to compare yet</h2><p>Run an AI review to compare code.</p><Link className="button primary" to="/scan">Select original file again</Link></section>}</div>;
 }
 

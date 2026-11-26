@@ -6,6 +6,8 @@ import math
 from pathlib import Path
 from typing import Any
 
+from .verification import code_structure
+
 MODEL_PATH = Path(__file__).with_name('patch_ranker_model.json')
 MODEL_VERSION = 'synthetic-ranknet-v1'
 FEATURES = ['syntax_valid', 'syntax_missing', 'scan_missing', 'before_count', 'after_count',
@@ -67,20 +69,24 @@ def rank_candidates(original: str, before: list[dict] | None, rounds: list[dict]
         return {'status': 'no_grounded_findings', 'candidates': []}
     candidates, seen = [], set()
     duplicate = False
+    original_structure = code_structure(original)
     for r in rounds:
         code, v = r.get('proposed_code'), r.get('verification')
         assessment = r.get('candidate_assessment') or {}
         if 'identical_to_round_one' in assessment.get('reasons', []):
             duplicate = True
-        if (not isinstance(code, str) or (code == original and not allow_unchanged_demo) or not isinstance(v, dict)
+        if (not isinstance(code, str) or not isinstance(v, dict)
                 or assessment.get('ranking_eligible') is False
                 or v.get('syntax_valid') is not True or not isinstance(r.get('bandit_after'), list)
                 or v.get('target_rule_still_reported') is True or v.get('unrelated_change_possible') is True):
             continue
-        if code in seen:
+        structure = code_structure(code)
+        if structure == original_structure and not allow_unchanged_demo:
+            continue
+        if structure in seen:
             duplicate = True
             continue
-        seen.add(code)
+        seen.add(structure)
         candidates.append(r)
     if len(candidates) < 2:
         result = {'status': 'single_candidate' if candidates else 'no_valid_candidates', 'candidates': []}

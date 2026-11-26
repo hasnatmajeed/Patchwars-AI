@@ -191,6 +191,7 @@ def test_refinement_prompt_preserves_selected_scope_and_feedback(monkeypatch):
     assert 'complete replacement for the supplied original_code only' in payload['messages'][0]['content']
     assert 'one short sentence' in payload['messages'][0]['content']
     assert payload['max_tokens'] == ai_agents.DEFENDER_TOKENS and payload['stream'] is False
+    assert 'response_format' not in payload and 'provider' not in payload
     assert result['proposed_code'] == 'def f(x):\n    return x\n'
 
 
@@ -454,12 +455,21 @@ def test_defender_truncation_is_not_retried_as_challenger(monkeypatch, caplog):
     calls = []
     def handler(request):
         calls.append(1)
-        return httpx.Response(200, json={'choices': [{'finish_reason': 'length', 'message': {'content': ''}}]})
+        return httpx.Response(200, json={
+            'choices': [{'finish_reason': 'length', 'native_finish_reason': 'max_tokens',
+                         'message': {'content': '{"proposed_code":"private_marker'}}],
+            'usage': {'prompt_tokens': 120, 'completion_tokens': 8192,
+                      'completion_tokens_details': {'reasoning_tokens': 8100}},
+        })
     configured(monkeypatch, handler)
     response = review()
     assert response.status_code == 502 and len(calls) == 1
     assert 'Defender generation' in response.json()['detail']
+    assert response.headers['X-Review-Category'] == 'truncated_response'
     assert 'stage=defender category=truncated_response attempt=1' in caplog.text
+    assert 'stage=defender max_tokens=8192 prompt_bytes=' in caplog.text
+    assert 'prompt_tokens=120 completion_tokens=8192 reasoning_tokens=8100 native_finish_reason=max_tokens' in caplog.text
+    assert 'private_marker' not in caplog.text and 'private_marker' not in response.text
 
 
 def test_invalid_envelope_logs_only_safe_metadata(monkeypatch, caplog):
@@ -506,7 +516,7 @@ def test_real_bandit_comparison_and_no_code_execution(monkeypatch, tmp_path):
         if len(requests) == 1:
             data = json.loads(body['messages'][1]['content'])
             assert data['original_code'] == source
-            assert any(f['test_id'] == 'B307' for f in data['bandit_findings'])
+            assert data['target_finding']['test_id'] == 'B307'
             return reply({'proposed_code': patch, 'explanation': 'Replace eval.'})
         assert json.loads(body['messages'][1]['content'])['proposed_code'] == patch
         return reply({'feedback': 'Check compatibility.', 'suggested_tests': ['Check input behavior.']})
@@ -550,8 +560,8 @@ def test_refinement_two_rounds(monkeypatch, tmp_path):
         data = json.loads(json.loads(request.content)['messages'][1]['content'])
         calls.append(data)
         if len(calls) == 1:
-            assert data['original_code'] == source and data['bandit_findings'] == [finding]
-            assert data['repair_objective']['issue_id'] == 'B307' and data['repair_objective']['line_number'] == 2
+            assert data['original_code'] == source
+            assert data['target_finding'] == {'test_id': 'B307', 'line_number': 2, 'description': 'eval'}
             return reply({'proposed_code': first, 'explanation': 'first'})
         if len(calls) == 2:
             assert data['proposed_code'] == first
@@ -913,15 +923,36 @@ def test_large_source_returns_validated_preview_hashes_without_sending_full_file
     ('x = 3\n', 'changed', 'available'),
     ('x = 1\n', 'unchanged', 'single_candidate'),
     ('x = 2\n', 'duplicate', 'single_candidate'),
+    ('x=2  # same code\n', 'duplicate', 'single_candidate'),
+    ('x=1  # same as original\n', 'unchanged', 'single_candidate'),
 ])
 def test_refinement_distinct_unchanged_and_duplicate(monkeypatch, second, status, rank_status):
     mock_grounded_scan(monkeypatch)
     calls = []
     def handler(request):
         payload = json.loads(request.content)
-        data = json.loads(payload['messages'][1]['content'])
+        user_message = payload['messages'][1]['content']
+        data = json.loads(user_message)
         calls.append((payload, data))
+        if len(calls) in (1, 3):
+            assert payload['model'] == 'openrouter/free'
+            assert payload['max_tokens'] == 8192
+            assert payload['provider'] == {'require_parameters': True}
+            response_format = payload['response_format']
+            assert response_format['type'] == 'json_schema'
+            assert response_format['json_schema']['strict'] is True
+            assert response_format['json_schema']['schema'] == {
+                'type': 'object', 'additionalProperties': False,
+                'properties': {'proposed_code': {'type': 'string'}, 'explanation': {'type': 'string'}},
+                'required': ['proposed_code', 'explanation'],
+            }
+            assert user_message == json.dumps(data, ensure_ascii=False, separators=(',', ':'))
+        else:
+            assert 'response_format' not in payload and 'provider' not in payload
         if len(calls) == 1:
+            assert set(data) == {'original_code', 'target_finding'}
+            assert data['original_code'] == 'x = 1\n'
+            assert data['target_finding'] == {'test_id': 'B307', 'description': 'synthetic issue', 'line_number': 1}
             return reply({'proposed_code':'x = 2\n', 'explanation':'first'})
         if len(calls) == 2:
             return reply({'feedback':'Check input.', 'suggested_tests':[]})
@@ -932,10 +963,12 @@ def test_refinement_distinct_unchanged_and_duplicate(monkeypatch, second, status
             assert data['target_finding']['test_id'] == 'B307'
             assert data['verification_summary']['syntax_valid'] is True
             assert 'target_rule_still_reported' in data['verification_summary']
-            assert 'distinct alternative to the original and previous proposal' in payload['messages'][0]['content']
+            assert 'distinct from the original and previous proposal' in payload['messages'][0]['content']
             return reply({'proposed_code':second, 'explanation':'second'})
         return reply({'feedback':'Review.', 'suggested_tests':[]})
     configured(monkeypatch, handler)
+    monkeypatch.setenv('AI_BASE_URL', 'https://openrouter.ai/api/v1')
+    monkeypatch.setenv('AI_MODEL', 'openrouter/free')
     response = review(b'x = 1\n', refine=True)
     assert response.status_code == 200
     result = response.json()

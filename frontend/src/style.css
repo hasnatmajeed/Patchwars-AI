@@ -295,7 +295,10 @@ body{background:#071321;color:#edf7ff}h1,h2,h3,.brand{font-family:Manrope,'Plus 
 .ranker-score { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; row-gap: 5px; }
 .ranker-score > strong { grid-column: 1 / -1; font-size: 14px; }
 .ranker-score .ranker-score-track { height: 12px; margin: 0; }
-.ranker-score-track span { min-width: 12%; background: linear-gradient(90deg, #9cc6f5, #5b88de); }
+.ranker-score-track span { background: linear-gradient(90deg, #9cc6f5, #5b88de); }
+.code-review-page .ranker-hero { box-shadow: 0 0 24px #0bc3f14d, inset 0 1px 14px #31dfff40; }
+.code-review-page .ranker-hero-body h3 { color: #f5f9ff; }
+.code-review-page .ranker-hero-body h3 span { color: #42f0f3; }
 .ranker-score.is-preferred .ranker-score-track span { background: linear-gradient(90deg, #4bf9f6, #16bde7); }
 .ranker-score-value { justify-self: end; padding: 4px 9px; border-radius: 20px; background: #24435e; color: #f1f7ff; font-size: 12px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; text-align: center; }
 .ranker-score.is-preferred .ranker-score-value { background: #36e7f2; color: #062638; font-weight: 800; }

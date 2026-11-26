@@ -26,7 +26,7 @@
 
 - **Neural ranking research demo (implemented):** A separate `/research/neural-ranking` page runs the saved model and local Bandit on a fixed, project-authored training example. It never creates a synthetic candidate in live AI review or calls the hosted provider.
 
-- **Round-two refinement reliability (implemented; live retest pending):** The refinement prompt explicitly uses the original scope, first proposal and critique. A truncated first refinement response may use the existing second-attempt budget with a concise instruction; field and Python syntax failures have distinct safe categories, and round one remains available. Syntax validity cannot establish semantic correctness.
+- **Round-two refinement reliability (implemented; live retest pending):** The refinement prompt uses the original scope, first proposal and critique. Truncation, invalid fields and Python syntax failures report distinct categories and preserve round one. Each provider call has one attempt.
 
 - **Visible neural ranking (implemented):** Results show the one-candidate explanation or experimental ranking rows, including tied scores and links to the corresponding code-review rounds. Mocked backend-to-stream-to-frontend and browser navigation checks cover explicit refinement and consent.
 
@@ -104,6 +104,8 @@
 - **Round 2 proposal clarity (implemented):** Optional refinement explicitly requests a distinct targeted alternative when justified; unchanged and duplicate outputs are labeled and excluded from distinct proposal counts and ranking. No additional retries were added.
 
 - **Round 2 truncation handling (implemented):** The Defender refinement sends only the target finding and essential context. A provider length stop preserves Round 1 and logs available token counts to help distinguish routing limits from completion-budget exhaustion.
+- **Defender JSON reliability (implemented):** Both rounds use compact target context and request strict JSON on the OpenRouter free router. Both retain the 8,192-token request cap and log available token usage on truncation. One free live Defender request returned valid patch JSON and passed syntax validation and a Bandit rescan on synthetic input. Mocked provider coverage verifies the existing ranking handoff for two eligible proposals.
+- **Two-patch Code Review (implemented):** Defender requests a behavior-preserving alternative. Python structure filters formatting-only changes and duplicates. Static verification accounts for displaced findings on unchanged lines. Code Review opens the preferred patch from the existing trained model when both proposals qualify and the scores differ.
 
 - **Zero-finding exploration (implemented):** Compact scan coverage and a dedicated exploratory results view distinguish observations from patch reviews and use the returned suggestion list consistently. Coverage is omitted when a measurable denominator is unavailable.
 

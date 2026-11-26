@@ -44,6 +44,16 @@ def test_introduced_finding_precludes_improvement_even_when_count_drops():
     assert result['verification_status'] == 'no_static_improvement'
 
 
+def test_insertions_do_not_report_displaced_findings_as_new():
+    target, existing, displaced = finding('B307', 1), finding('B101', 2), finding('B101', 3)
+    report = verify_patch('value = eval(text)\nassert value\n',
+                          'import ast\nvalue = ast.literal_eval(text)\nassert value\n',
+                          [target, existing], [displaced], target)
+    assert report['remaining_findings'] == [displaced]
+    assert report['introduced_findings'] == []
+    assert report['verification_status'] == 'static_improvement'
+
+
 @pytest.mark.parametrize('before,after', [(None, []), ([], None), (None, None)])
 def test_unavailable_scan_is_incomplete(before, after):
     result = verify_patch('x = 1', 'x = 2', before, after)
